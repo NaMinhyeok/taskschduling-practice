@@ -7,11 +7,14 @@ import minhyeok.taskschedulingpractice.domain.vote.Vote;
 import minhyeok.taskschedulingpractice.domain.vote.VoteRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -21,6 +24,8 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final TaskScheduler taskScheduler;
     private final ApplicationEventPublisher eventPublisher;
+    private final ScheduledAnnotationBeanPostProcessor postProcessor;
+    private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Transactional
     public void createVote(LocalDateTime endAt) {
@@ -31,7 +36,8 @@ public class VoteService {
     }
 
     private void addVoteTaskToTaskSchedule(Vote vote) {
-        taskScheduler.schedule(publishClosedVoteTask(vote.getId()), vote.getInstantEndAt());
+        ScheduledFuture<?> schedule = taskScheduler.schedule(publishClosedVoteTask(vote.getId()), vote.getInstantEndAt());
+        scheduledTasks.put(vote.getId(), schedule);
         log.info("투표 종료 이벤트가 등록되었습니다. 투표 ID: {}", vote.getId());
     }
 
@@ -41,15 +47,18 @@ public class VoteService {
 
     @Transactional
     public void endVote(Long id) {
-        log.info("투표 종료 이벤트가 발생했습니다.");
+        log.info("투표를 종료합니다. 투표 ID: {}", id);
         Vote vote = voteRepository.findById(id).orElseThrow(
             () -> new IllegalArgumentException("해당하는 투표가 없습니다.")
         );
         vote.updateVoteStatusToClose();
-    }
-
-    public void checkTaskSchedule() {
-
+        log.info("스케줄된 작업을 통해 투표를 종료합니다. 투표 ID: {}", id);
+        ScheduledFuture<?> scheduledTask = scheduledTasks.get(id);
+        if (scheduledTask == null) {
+            log.error("해당하는 투표 ID로 등록된 작업이 없습니다.");
+            return;
+        }
+        scheduledTask.cancel(false);
     }
 
 }

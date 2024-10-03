@@ -14,7 +14,7 @@ public class SchedulingConfig {
     public static final String THREAD_NAME_PREFIX = "TaskScheduler-";
 
     @Bean
-    public TaskScheduler taskScheduler() {
+    public ThreadPoolTaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setPoolSize(POOL_SIZE);
         taskScheduler.setThreadNamePrefix(THREAD_NAME_PREFIX);
