@@ -1,5 +1,6 @@
 package minhyeok.taskschedulingpractice.api.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import minhyeok.taskschedulingpractice.domain.vote.RegisteredVoteEvent;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -24,7 +26,6 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final TaskScheduler taskScheduler;
     private final ApplicationEventPublisher eventPublisher;
-    private final ScheduledAnnotationBeanPostProcessor postProcessor;
     private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Transactional
@@ -59,6 +60,15 @@ public class VoteService {
             return;
         }
         scheduledTask.cancel(false);
+        scheduledTasks.remove(id);
+    }
+
+    @PostConstruct
+    public void initializeScheduledTasks() {
+        List<Vote> activeVotes = voteRepository.findOpenVotes();
+        for (Vote vote : activeVotes) {
+            addVoteTaskToTaskSchedule(vote);
+        }
     }
 
 }
